@@ -1,0 +1,26 @@
+{
+  "name": "Agentic Coding Hands-on",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-24-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "hostRequirements": {
+    "cpus": 4
+  },
+  "forwardPorts": [3000, 5173],
+  "portsAttributes": {
+    "3000": { "label": "backend" },
+    "5173": { "label": "frontend" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "biomejs.biome",
+        "ms-playwright.playwright",
+        "github.vscode-github-actions"
+      ]
+    }
+  },
+  "remoteUser": "node"
+}

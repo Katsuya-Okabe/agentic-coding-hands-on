@@ -1,1 +1,0 @@
-設計ファイル @/docs/prompt/implementation_plan_vibe_order.md のサイズが大きすぎます。分離可能な箇所をshared/, frontend/, backend/, aws/に分離するための計画を立てて下さい。

@@ -1,1 +1,0 @@
-@/docs/design/implementation_plan_vibe_order.md と@/packages/shared/docs/design.md を元に、shared/部分の実装計画を検討してください。各イテレーションで細かく品質確認をしながら着実に進めるプランを取ってください。

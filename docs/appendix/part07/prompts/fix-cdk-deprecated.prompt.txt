@@ -1,1 +1,0 @@
-npm run test -w @myapp/aws を実行してください。deprecatedが発生する箇所については、MCPで調べてください

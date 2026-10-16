@@ -1,1 +1,0 @@
-/selfcheck.md @/docs/design/cicd-system-design.md
