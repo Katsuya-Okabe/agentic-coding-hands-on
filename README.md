@@ -69,6 +69,7 @@ docs/
   Day1〜Day5_*.md       各日の研修ドキュメント
   ClaudeCodeチートシート.md
   講師ガイド.md
+  slides/               研修説明用の HTML スライド
   worksheets/           比較シート、日報、発表テンプレート
   ref/AgenticCoding.pdf ベース教材
 hands-on/
@@ -83,3 +84,9 @@ hands-on/
 ## 講師の方へ
 
 事前準備、当日の運営、評価については [講師ガイド](docs/講師ガイド.md) を参照してください。
+
+研修の説明用スライドは [docs/slides/agentic-coding-training.html](docs/slides/agentic-coding-training.html) です。ブラウザで開いて使います。
+
+*   `→` / `Space` / クリックで次へ、`←` で前へ
+*   `N` で発表者ノートを表示、`F` で全画面
+*   ブラウザの印刷機能で「PDF に保存」すると、全スライドを PDF にできます
