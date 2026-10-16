@@ -51,7 +51,7 @@ flowchart LR
 | 実行環境 | Codespaces 上で起動し、ポート転送で公開 |
 | CI | GitHub Actions |
 
-*   ブラウザは最新の Google Chrome を使ってください。
+*   ブラウザは最新の Google Chrome を使い、**Claude in Chrome** 拡張を追加してください（手順は [Day1](docs/Day1_環境構築とVibeCoding体験.md)）。Codespaces で貼り付けるにはクリップボードの許可が必要なため、権限を変更できない他のブラウザ（Claude アプリの内蔵ブラウザなど）では進められません。
 *   画面が狭いと AI の出力とコードを並べて見られません。可能であれば外部モニターを使ってください。
 
 ## 進め方
