@@ -1,0 +1,44 @@
+# 参考: Vibe Order の CI ワークフロー例（.github/workflows/vibe-order-ci.yml）
+# AI が作成したワークフローと比べて、不足している観点がないかを確認するために使う。
+name: vibe-order-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ["vibe-order/**", ".github/workflows/vibe-order-ci.yml"]
+  pull_request:
+    paths: ["vibe-order/**", ".github/workflows/vibe-order-ci.yml"]
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: vibe-order
+
+jobs:
+  check-test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: vibe-order/package-lock.json
+      - run: npm ci
+      - run: npm run check
+      - run: npx vitest --run --coverage
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --reporter=list,html
+        working-directory: vibe-order/packages/frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: vibe-order/packages/frontend/playwright-report
+          retention-days: 7

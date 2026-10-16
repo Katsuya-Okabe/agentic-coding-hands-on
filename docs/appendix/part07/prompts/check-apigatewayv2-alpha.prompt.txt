@@ -1,1 +1,0 @@
-aws-apigatewayv2については、Alpha版をもう使う必要はないはずです。MCPで調べてください。

@@ -1,0 +1,8 @@
+設計ファイル @vibe-order/docs/design/system-design.md は1つのファイルとしては大きすぎます。
+共通部分を残しつつ、パッケージ単位で独立して実装できるように、以下の3ファイルへ分割してください。
+
+- vibe-order/packages/shared/docs/design.md
+- vibe-order/packages/backend/docs/design.md
+- vibe-order/packages/frontend/docs/design.md
+
+分割後、system-design.md には全体像と各ファイルへのリンクだけを残してください。

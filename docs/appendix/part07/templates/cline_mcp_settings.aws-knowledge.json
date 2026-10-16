@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "aws-knowledge-mcp-server": {
-      "command": "uvx",
-      "args": ["fastmcp", "run", "https://knowledge-mcp.global.api.aws"]
-    }
-  }
-}

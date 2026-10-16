@@ -1,1 +1,0 @@
-@/docs/design/implementation_plan_vibe_order.md と@/packages/backend/docs/design.md を元に、backend/部分の実装計画を検討してください。各イテレーションで細かく品質確認をしながら着実に進めるプランを取ってください。honoの扱い方が分からない部分は@/docs/ref/hono/llms.txt を参照してください。

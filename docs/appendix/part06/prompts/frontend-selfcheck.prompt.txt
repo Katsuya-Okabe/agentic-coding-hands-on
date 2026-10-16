@@ -1,1 +1,0 @@
-/selfcheck @/docs/design/implementation_plan_vibe_order.md と@/packages/frontend/docs/design.md を元に、frontend/部分の実装をレビューしてください。

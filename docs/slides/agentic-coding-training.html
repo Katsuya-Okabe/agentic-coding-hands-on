@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agentic Coding 体験研修</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap">
+<style>
+  /* 操作: ← → / Space / クリックでページ送り、N で発表者ノート、F で全画面、印刷で全スライドを PDF 化 */
+  html, body { margin: 0; height: 100%; background: #0B1222; overflow: hidden; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center center; }
+  section { position: absolute; inset: 0; width: 1920px; height: 1080px; box-sizing: border-box; overflow: hidden; }
+  @media screen { section:not(.active) { display: none !important; } }
+  section aside { display: none; }
+  h1, h2, h3, p, ul, ol { margin: 0; }
+  ul, ol { padding-left: 1.2em; }
+  div { box-sizing: border-box; }
+  /* display 指定のない div は縦並び（スライド形式の既定） */
+  #stage div:not([style*="display:"]) { display: flex; flex-direction: column; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 0.35em 0.6em; text-align: left; border-bottom: 1px solid rgba(127, 127, 127, 0.25); font-weight: inherit; }
+  th { font-weight: 700; }
+  x-shape { display: block; flex: none; }
+  x-shape[kind="arrow-right"] { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); }
+  x-icon { display: block; flex: none; }
+  x-icon svg { width: 100%; height: 100%; display: block; }
+  #notes { position: fixed; left: 0; right: 0; bottom: 0; max-height: 30vh; overflow: auto; padding: 16px 24px; background: rgba(11, 18, 34, 0.92); color: #F7F6F2; font: 16px/1.7 'Noto Sans JP', sans-serif; display: none; }
+  #notes.show { display: block; }
+  #pager { position: fixed; right: 16px; bottom: 12px; color: #8A94A6; font: 14px 'JetBrains Mono', monospace; }
+  @media print {
+    @page { size: 1920px 1080px; margin: 0; }
+    html, body { overflow: visible; height: auto; background: none; }
+    #stage { position: static; transform: none !important; width: auto; height: auto; }
+    section { position: relative; page-break-after: always; break-after: page; }
+    #notes, #pager { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+
+<section id="cover" data-transition="fade" style="background:#14213D;color:#F7F6F2;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:center;gap:40px">
+<div style="position:absolute;left:0;top:0;width:24px;height:1080px;background:#E8833A"></div>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:32px;color:#E8833A;letter-spacing:4px">AGENTIC CODING HANDS-ON</p>
+<h1 style="font-size:120px;font-weight:900;line-height:1.15">Agentic Coding<br>体験研修</h1>
+<p style="font-size:44px;color:#BFD0E8">Vibe Coding の手軽さから、AIと品質を両立する開発へ</p>
+<p style="position:absolute;left:128px;bottom:96px;width:1600px;font-size:28px;color:#BFD0E8">5日間 ／ 新入社員・AI駆動開発入門者向け ／ ベース教材：AgenticCoding.pdf</p>
+<aside>この研修は、座学ではなく手を動かして Agentic Coding を体験することが目的です。まず Vibe Coding の手軽さを体験し、次にその問題点に直面し、Agentic Coding で解決する、という流れで進みます。</aside>
+</section>
+
+<section id="aim" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">OVERVIEW</p>
+<h2 style="font-size:64px;font-weight:700">研修のねらい</h2>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px">
+<div style="display:flex;flex-direction:column;gap:20px;background:#FFFFFF;padding:48px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Play" style="color:#E8833A;width:64px;height:64px"></x-icon>
+<h3 style="font-size:40px;font-weight:700">体験が主役</h3>
+<p style="font-size:28px;color:#4A5568;line-height:1.6">座学は各日30分程度。1日の8割以上は手を動かす</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:20px;background:#FFFFFF;padding:48px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Users" style="color:#E8833A;width:64px;height:64px"></x-icon>
+<h3 style="font-size:40px;font-weight:700">対象者</h3>
+<p style="font-size:28px;color:#4A5568;line-height:1.6">新入社員と、Coding Agent をこれから業務で使う AI 駆動開発の入門者</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:20px;background:#FFFFFF;padding:48px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="GraduationCap" style="color:#E8833A;width:64px;height:64px"></x-icon>
+<h3 style="font-size:40px;font-weight:700">ゴール</h3>
+<p style="font-size:28px;color:#4A5568;line-height:1.6">「AIにどう委ねればよいか」を、自分の体験と数字で説明できる</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">2</p>
+<aside>書籍の内容をすべて網羅するのではなく、体験を通じて AI への委ね方を身につけることが目的です。開発は個人で行い、最終日にチームで発表します。</aside>
+</section>
+
+<section id="story" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">STORY</p>
+<h2 style="font-size:64px;font-weight:700">便利さ → 失敗 → 解決 → 実感</h2>
+</div>
+<div style="display:flex;align-items:stretch;gap:16px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:40px;border-radius:20px;border-top:8px solid #E8833A">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#C2621F;font-weight:700">Day1</p>
+<h3 style="font-size:36px;font-weight:700">手軽さを体験</h3>
+<p style="font-size:26px;color:#4A5568;line-height:1.6">雑なプロンプトだけで、数時間で Vibe Chat が完成する</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:40px;height:24px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:40px;border-radius:20px;border-top:8px solid #D04E3C">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#B03A2A;font-weight:700">Day2</p>
+<h3 style="font-size:36px;font-weight:700">問題点に直面</h3>
+<p style="font-size:26px;color:#4A5568;line-height:1.6">機能追加で壊れる。テストもない。自分で検証し言語化する</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:40px;height:24px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:40px;border-radius:20px;border-top:8px solid #3A7BD5">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#2F65B0;font-weight:700">Day3-4</p>
+<h3 style="font-size:36px;font-weight:700">解決する</h3>
+<p style="font-size:26px;color:#4A5568;line-height:1.6">4つの作法を整え、Vibe Order を AI と一緒に開発する</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:40px;height:24px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#14213D;padding:40px;border-radius:20px;border-top:8px solid #E8833A">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#E8833A;font-weight:700">Day5</p>
+<h3 style="font-size:36px;font-weight:700;color:#F7F6F2">効果を実感</h3>
+<p style="font-size:26px;color:#BFD0E8;line-height:1.6">同じ種類の変更依頼で Before/After を比較する</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">3</p>
+<aside>研修のストーリーは4段階です。Day1〜2 ではあえて Vibe Coding のまま進めます。問題に自分で気づくことが、Day3 以降の学びの動機になります。</aside>
+</section>
+
+<section id="schedule" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">SCHEDULE</p>
+<h2 style="font-size:64px;font-weight:700">5日間の時間割</h2>
+</div>
+<table style="font-size:28px;color:#14213D">
+<tr style="background:#14213D"><th style="width:12%;color:#F7F6F2">Day</th><th style="width:30%;color:#F7F6F2">テーマ</th><th style="width:44%;color:#F7F6F2">主な体験</th><th style="width:14%;color:#F7F6F2">書籍</th></tr>
+<tr style="background:#FFFFFF"><td>Day1</td><td>環境構築と Vibe Coding</td><td>Codespaces と Claude Code の準備、Vibe Chat を作る</td><td>PART1〜3</td></tr>
+<tr><td>Day2</td><td>Vibe Coding の限界と転換</td><td>機能追加で壊れる体験、品質検証、ガードレール</td><td>PART4</td></tr>
+<tr style="background:#FFFFFF"><td>Day3</td><td>開発基盤と要件の具体化</td><td>モノレポ、テスト、Lint、CI、設計書の作成</td><td>PART5〜6</td></tr>
+<tr><td>Day4</td><td>Agentic Coding で実装</td><td>shared / backend / frontend を TDD で実装</td><td>PART6</td></tr>
+<tr style="background:#FFFFFF"><td>Day5</td><td>仕上げ・比較・発表</td><td>E2E、Codespaces で公開、Before/After 比較</td><td>PART7</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">4　　1日 9:30〜17:30（昼休憩 12:00〜13:00）</p>
+<aside>Day5 の PART7 は、AWS へのデプロイを Codespaces での起動と GitHub Actions の CI に読み替えています。</aside>
+</section>
+
+<section id="env" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">ENVIRONMENT</p>
+<h2 style="font-size:64px;font-weight:700">研修環境</h2>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px">
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:44px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Cloud" style="color:#3A7BD5;width:56px;height:56px"></x-icon>
+<h3 style="font-size:36px;font-weight:700">GitHub Codespaces</h3>
+<p style="font-size:28px;color:#4A5568;line-height:1.6">リポジトリを fork して起動。クラウド上の隔離環境なので、AI が失敗しても PC は無傷</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:44px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Chat" style="color:#3A7BD5;width:56px;height:56px"></x-icon>
+<h3 style="font-size:36px;font-weight:700">Claude Code</h3>
+<p style="font-size:28px;color:#4A5568;line-height:1.6">VS Code 拡張のチャットパネルから指示。AI は社内契約の Claude を使う</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:44px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Check" style="color:#3A7BD5;width:56px;height:56px"></x-icon>
+<h3 style="font-size:36px;font-weight:700">GitHub Actions</h3>
+<p style="font-size:28px;color:#4A5568;line-height:1.6">CI で check / test / build / E2E を自動実行。アプリは Codespaces 上でポート公開</p>
+</div>
+</div>
+<p style="font-size:28px;color:#4A5568">書籍の Cline・Amazon Bedrock・AWS 構成は、本研修では上記の環境に読み替えます。</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">5</p>
+<aside>ブラウザは最新の Chrome を推奨します。画面が狭いと AI の出力とコードを並べて見られないため、可能であれば外部モニターを使ってください。</aside>
+</section>
+
+<section id="day1" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">DAY 1 ／ PART1〜3</p>
+<h2 style="font-size:64px;font-weight:700">環境構築と Vibe Coding 体験</h2>
+</div>
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<h3 style="font-size:36px;font-weight:700">今日の流れ</h3>
+<ul style="font-size:28px;color:#4A5568;line-height:1.7">
+<li>オリエンテーション、LLM と Agent の要点</li>
+<li>fork して Codespaces を起動、Claude Code にサインイン</li>
+<li>小さな指示で AI の動き方を観察する</li>
+<li>Vibe Chat を作る（約3時間）</li>
+<li>チーム内で見せ合い、比較シートに記録</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#14213D;padding:48px;border-radius:20px">
+<h3 style="font-size:36px;font-weight:700;color:#E8833A">Vibe Coding のルール</h3>
+<ol style="font-size:30px;color:#F7F6F2;line-height:1.7">
+<li>自然言語だけで指示する</li>
+<li>AI の提案はそのまま承認する</li>
+<li>コードは読まない。画面だけ見て直させる</li>
+</ol>
+<p style="font-size:26px;color:#BFD0E8;line-height:1.6">「読まなかったこと」の代償は、翌日体験します。</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">6</p>
+<aside>Vibe Coding 中に「コードを読んでもいいですか」と聞かれたら、今日は読まないでくださいと答えます。完成度に差が出ても問題ありません。動かない部分があること自体が Day2 の材料になります。</aside>
+</section>
+
+<section id="day2" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">DAY 2 ／ PART4</p>
+<h2 style="font-size:64px;font-weight:700">Vibe Coding の限界に直面する</h2>
+</div>
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<h3 style="font-size:36px;font-weight:700">午前：問題を体験し、自分で検証する</h3>
+<ul style="font-size:28px;color:#4A5568;line-height:1.7">
+<li>Vibe Chat に機能追加を依頼（60分で打ち切り）</li>
+<li>テスト・Lint・npm audit・古いライブラリを自分で調べる</li>
+<li>見つけた問題をチームで4つに分類する</li>
+</ul>
+</div>
+<div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px">
+<div style="display:flex;flex-direction:column;gap:8px;background:#FFFFFF;padding:28px;border-radius:16px;border-left:6px solid #D04E3C">
+<p style="font-size:28px;font-weight:700">曖昧な要件</p>
+<p style="font-size:24px;color:#4A5568">「イケてる」が人で違う</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;background:#FFFFFF;padding:28px;border-radius:16px;border-left:6px solid #D04E3C">
+<p style="font-size:28px;font-weight:700">検証条件がない</p>
+<p style="font-size:24px;color:#4A5568">壊れても気づけない</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;background:#FFFFFF;padding:28px;border-radius:16px;border-left:6px solid #D04E3C">
+<p style="font-size:28px;font-weight:700">スタイル不統一</p>
+<p style="font-size:24px;color:#4A5568">ファイルごとに書き方が違う</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;background:#FFFFFF;padding:28px;border-radius:16px;border-left:6px solid #D04E3C">
+<p style="font-size:28px;font-weight:700">致命的なミス</p>
+<p style="font-size:24px;color:#4A5568">秘密情報の流出、データ削除</p>
+</div>
+</div>
+</div>
+<p style="font-size:28px;color:#14213D"><b>午後：</b>4つの作法を学び、権限設定とブランチ保護でガードレールを張る。Plan モードで不具合を1つ直す。</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">7</p>
+<aside>品質検証は AI に頼らず、受講者自身にコマンドを実行させます。ガードレール体験では、AI が cat コマンドなどで .env を読もうと回り込むケースがあります。権限設定だけでは防ぎきれず、多層防御が必要な好例として全体で共有してください。</aside>
+</section>
+
+<section id="practices" data-transition="fade" style="background:#14213D;color:#F7F6F2;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#E8833A;letter-spacing:3px">PART4 ／ 正しい委ね方</p>
+<h2 style="font-size:64px;font-weight:700">お願いではなく、仕組みで強制する</h2>
+</div>
+<table style="font-size:28px;color:#F7F6F2">
+<tr style="background:#24345A"><th style="width:28%;color:#E8833A">Vibe Coding の問題</th><th style="width:32%;color:#E8833A">4つの作法</th><th style="width:40%;color:#E8833A">研修で使う仕組み</th></tr>
+<tr><td>曖昧な要件</td><td>要件定義の具体化</td><td>Plan モード、要件定義書、設計書</td></tr>
+<tr style="background:#1B2A4A"><td>検証条件がない</td><td>自動テストの採用</td><td>Vitest、Playwright、TDD</td></tr>
+<tr><td>スタイル不統一</td><td>規約・スタイルの維持</td><td>Biome、CLAUDE.md、npm scripts、CI</td></tr>
+<tr style="background:#1B2A4A"><td>致命的なミス</td><td>ガードレール</td><td>Git、Codespaces、権限設定、ブランチ保護</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#BFD0E8">8</p>
+<aside>Day2 午後のミニ講義の中心となる表です。午前に受講者が見つけた問題と対応づけて説明します。ポイントは、AI に気をつけてとお願いするのではなく、テストや CI や権限設定で強制することです。</aside>
+</section>
+
+<section id="day3" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">DAY 3 ／ PART5〜6</p>
+<h2 style="font-size:64px;font-weight:700">開発基盤構築と要件の具体化</h2>
+</div>
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<h3 style="font-size:36px;font-weight:700">今日の流れ</h3>
+<ul style="font-size:28px;color:#4A5568;line-height:1.7">
+<li>CLAUDE.md とカスタムコマンドを配置</li>
+<li>Plan モードでモノレポ計画 → レビュー → 構築</li>
+<li>Pull Request で CI を通してマージ</li>
+<li>要件から設計書を作り、パッケージ単位に分割</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<h3 style="font-size:36px;font-weight:700">書籍（Cline）からの読み替え</h3>
+<table style="font-size:26px;color:#14213D">
+<tr style="background:#14213D"><th style="width:45%;color:#F7F6F2">Cline</th><th style="width:55%;color:#F7F6F2">Claude Code</th></tr>
+<tr style="background:#FFFFFF"><td>.clinerules</td><td>CLAUDE.md</td></tr>
+<tr><td>Workflows</td><td>.claude/commands</td></tr>
+<tr style="background:#FFFFFF"><td>.clineignore</td><td>.claude/settings.json</td></tr>
+<tr><td>/deep-planning</td><td>Plan モード</td></tr>
+</table>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">9</p>
+<aside>Plan モードの計画を受講者が読まずに承認していないかを確認します。計画に対して1つ以上の修正依頼を出すよう促してください。モノレポ構築が14時半の時点で終わっていない人には、リファレンス実装の雛形を提供します。</aside>
+</section>
+
+<section id="day4" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">DAY 4 ／ PART6</p>
+<h2 style="font-size:64px;font-weight:700">開発サイクルを3回まわす</h2>
+</div>
+<div style="display:flex;align-items:stretch;gap:16px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;padding:36px;border-radius:20px;border:1px solid #E2DFD6">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#2F65B0;font-weight:700">1</p>
+<h3 style="font-size:32px;font-weight:700">計画</h3>
+<p style="font-size:24px;color:#4A5568;line-height:1.6">新しい会話・Plan モード</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:36px;height:22px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;padding:36px;border-radius:20px;border:1px solid #E2DFD6">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#2F65B0;font-weight:700">2</p>
+<h3 style="font-size:32px;font-weight:700">レビュー</h3>
+<p style="font-size:24px;color:#4A5568;line-height:1.6">人が読んで直させる。/save-plan</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:36px;height:22px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;padding:36px;border-radius:20px;border:1px solid #E2DFD6">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#2F65B0;font-weight:700">3</p>
+<h3 style="font-size:32px;font-weight:700">TDD</h3>
+<p style="font-size:24px;color:#4A5568;line-height:1.6">Red → Green → Refactor</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:36px;height:22px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;padding:36px;border-radius:20px;border:1px solid #E2DFD6">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#2F65B0;font-weight:700">4</p>
+<h3 style="font-size:32px;font-weight:700">/selfcheck</h3>
+<p style="font-size:24px;color:#4A5568;line-height:1.6">設計と実装を突き合わせる</p>
+</div>
+<x-shape kind="arrow-right" style="background:#C9C4B6;width:36px;height:22px;align-self:center"></x-shape>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#14213D;padding:36px;border-radius:20px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#E8833A;font-weight:700">5</p>
+<h3 style="font-size:32px;font-weight:700;color:#F7F6F2">PR と CI</h3>
+<p style="font-size:24px;color:#BFD0E8;line-height:1.6">CI が通ればマージ</p>
+</div>
+</div>
+<p style="font-size:30px;color:#14213D">shared → backend → frontend の順に実装。カバレッジ80%以上を保つ。<br><span style="color:#4A5568">パッケージが変わるたびに新しい会話を始め、llms.txt で最新の公式情報を参照させる。</span></p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">10</p>
+<aside>最も遅れが出やすい日です。frontend は Day5 午前まで延長してよいことを朝に伝えておきます。AI がテストを書かずに実装を進めていたら、受講者から「テストはどこ？」と AI に聞かせます。</aside>
+</section>
+
+<section id="vibeorder" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">題材アプリ</p>
+<h2 style="font-size:64px;font-weight:700">Vibe Order（Codespaces 版 MVP）</h2>
+</div>
+<div style="display:flex;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<h3 style="font-size:36px;font-weight:700">MVP の機能</h3>
+<ul style="font-size:28px;color:#4A5568;line-height:1.7">
+<li>席を選んでメニューから注文</li>
+<li>キッチン画面に新規注文を即時表示</li>
+<li>受付 → 調理中 → 提供済の状態遷移</li>
+<li>キャンセルは「受付」のときのみ</li>
+<li>WebSocket 切断時の自動再接続</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px">
+<h3 style="font-size:36px;font-weight:700">AWS 構成からの置き換え</h3>
+<table style="font-size:26px;color:#14213D">
+<tr style="background:#14213D"><th style="width:50%;color:#F7F6F2">書籍</th><th style="width:50%;color:#F7F6F2">研修</th></tr>
+<tr style="background:#FFFFFF"><td>API Gateway + Lambda</td><td>Hono + WebSocket</td></tr>
+<tr><td>DynamoDB</td><td>SQLite</td></tr>
+<tr style="background:#FFFFFF"><td>S3 + CloudFront</td><td>Codespaces ポート公開</td></tr>
+<tr><td>CDK デプロイ</td><td>GitHub Actions CI</td></tr>
+</table>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">11</p>
+<aside>書籍 PART6 の要求仕様をもとに、研修用に範囲を絞っています。席の状態管理、再注文、メニューの CRUD、スタッフ認証は、時間が余った人の拡張課題です。</aside>
+</section>
+
+<section id="day5" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">DAY 5 ／ PART7（読み替え）</p>
+<h2 style="font-size:64px;font-weight:700">同じ変更依頼で Before/After を比較する</h2>
+</div>
+<table style="font-size:28px;color:#14213D">
+<tr style="background:#14213D"><th style="width:40%;color:#F7F6F2">比較の観点</th><th style="width:30%;color:#F7F6F2">Before：Vibe Chat</th><th style="width:30%;color:#F7F6F2">After：Vibe Order</th></tr>
+<tr style="background:#FFFFFF"><td>手戻りの回数</td><td>Day2 に記録</td><td>Day5 に記録</td></tr>
+<tr><td>壊れた既存機能（デグレ）</td><td>Day2 に記録</td><td>Day5 に記録</td></tr>
+<tr style="background:#FFFFFF"><td>デグレに気づいたきっかけ</td><td>手動確認？</td><td>テスト・CI？</td></tr>
+<tr><td>テスト数・カバレッジ</td><td>Day2 に記録</td><td>Day5 に記録</td></tr>
+<tr style="background:#FFFFFF"><td>変更後の安心感（1〜5）</td><td>Day2 に記録</td><td>Day5 に記録</td></tr>
+</table>
+<p style="font-size:28px;color:#4A5568">比べるのは速さだけではない。<b style="color:#14213D">壊れたことにすぐ気づけるか、安心して変更できるか。</b></p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">12　　午前：E2E と CI、Codespaces で公開 ／ 午後：チーム発表と全体振り返り</p>
+<aside>研修の山場です。時間が足りない場合は E2E テストを1フローに簡略化し、比較の時間を確保します。発表では数字だけでなく「自分の役割がどう変わったか」を語らせると理解が深まります。</aside>
+</section>
+
+<section id="rubric" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">EVALUATION</p>
+<h2 style="font-size:64px;font-weight:700">評価の観点</h2>
+</div>
+<table style="font-size:26px;color:#14213D">
+<tr style="background:#14213D"><th style="width:20%;color:#F7F6F2">観点</th><th style="width:80%;color:#F7F6F2">「できている」の目安</th></tr>
+<tr style="background:#FFFFFF"><td>問題の言語化</td><td>Vibe Coding の問題を4分類で説明し、具体例を挙げられる</td></tr>
+<tr><td>計画のレビュー</td><td>AI の計画に、根拠のある修正依頼を出している</td></tr>
+<tr style="background:#FFFFFF"><td>品質のゲート</td><td>テスト・Lint・CI が通る状態を保ち、カバレッジ80%以上</td></tr>
+<tr><td>ガードレール</td><td>権限設定とブランチ保護を設定し、その意図を説明できる</td></tr>
+<tr style="background:#FFFFFF"><td>振り返り</td><td>比較シートの数字をもとに、自分の役割の変化を説明できる</td></tr>
+</table>
+<p style="font-size:26px;color:#4A5568">提出物：自分の fork リポジトリ、比較シート、日報（5日分）、チーム発表資料</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">13</p>
+<aside>各観点は3段階（できている／おおむねできている／要支援）で評価します。詳しくは講師ガイドのルーブリックを参照してください。</aside>
+</section>
+
+<section id="prep" data-transition="fade" style="background:#F7F6F2;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:26px;color:#C2621F;letter-spacing:3px">PREPARATION</p>
+<h2 style="font-size:64px;font-weight:700">講師の事前準備</h2>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px">
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:44px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Key" style="color:#E8833A;width:56px;height:56px"></x-icon>
+<h3 style="font-size:34px;font-weight:700">アカウント</h3>
+<ul style="font-size:26px;color:#4A5568;line-height:1.6">
+<li>Claude の社内契約を全員に割当</li>
+<li>研修用 Organization へ招待</li>
+<li>AI 利用量の目安と上限</li>
+</ul>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:44px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Settings" style="color:#E8833A;width:56px;height:56px"></x-icon>
+<h3 style="font-size:34px;font-weight:700">GitHub</h3>
+<ul style="font-size:26px;color:#4A5568;line-height:1.6">
+<li>Codespaces（4コア以上）と課金</li>
+<li>Actions の利用枠</li>
+<li>Public ポート公開の禁止</li>
+</ul>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;padding:44px;border-radius:20px;border:1px solid #E2DFD6">
+<x-icon name="Wrench" style="color:#E8833A;width:56px;height:56px"></x-icon>
+<h3 style="font-size:34px;font-weight:700">リハーサル</h3>
+<ul style="font-size:26px;color:#4A5568;line-height:1.6">
+<li>講師が Day1〜5 を通しで実施</li>
+<li>救済用の完成版を別ブランチに</li>
+<li>当日のバージョンで動作確認</li>
+</ul>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6B7280">14</p>
+<aside>リファレンス実装（Vibe Order の完成版）は、遅れている受講者の救済に使います。Day3 のモノレポ構築や Day4 の実装で遅れた場合、雛形ブランチを merge させて先に進めます。</aside>
+</section>
+
+<section id="closing" data-transition="fade" style="background:#E8833A;color:#14213D;font-family:'Noto Sans JP', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:center;gap:40px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:32px;letter-spacing:4px;font-weight:700">TAKEAWAY</p>
+<h1 style="font-size:96px;font-weight:900;line-height:1.25">人が意図を示し、AI が作り、<br>人が責任をもって仕上げる。</h1>
+<p style="font-size:40px;line-height:1.5">要件・テスト・規約・ガードレールを整えれば、<br>AI は速さと品質を両立できる。</p>
+<aside>書籍 PART3 で示される Agentic Coding の体制です。明日から自分の業務で AI を使うとき、まず何を整えるか（CLAUDE.md、テスト、CI、権限設定）を一人ひとりに考えてもらい、研修を締めくくります。</aside>
+</section>
+
+</div>
+<div id="notes"></div>
+<div id="pager"></div>
+<script>
+(function () {
+  var ICONS = {
+    Play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+    Users: '<circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/>',
+    GraduationCap: '<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/>',
+    Cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+    Chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    Check: '<path d="M20 6 9 17l-5-5"/>',
+    Key: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>',
+    Settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>',
+    Wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>'
+  };
+  document.querySelectorAll('x-icon').forEach(function (el) {
+    var body = ICONS[el.getAttribute('name')] || '<circle cx="12" cy="12" r="9"/>';
+    el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>';
+  });
+
+  var stage = document.getElementById('stage');
+  var slides = Array.prototype.slice.call(stage.querySelectorAll('section'));
+  var notes = document.getElementById('notes');
+  var pager = document.getElementById('pager');
+  var index = 0;
+
+  function fromHash() {
+    var n = parseInt(location.hash.replace('#', ''), 10);
+    return isNaN(n) ? 0 : Math.min(Math.max(n - 1, 0), slides.length - 1);
+  }
+  function show(i) {
+    index = Math.min(Math.max(i, 0), slides.length - 1);
+    slides.forEach(function (s, j) { s.classList.toggle('active', j === index); });
+    var aside = slides[index].querySelector('aside');
+    notes.textContent = aside ? aside.textContent.trim() : '';
+    pager.textContent = (index + 1) + ' / ' + slides.length;
+    history.replaceState(null, '', '#' + (index + 1));
+  }
+  function fit() {
+    var scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+  }
+  document.addEventListener('keydown', function (e) {
+    if (['ArrowRight', 'PageDown', ' ', 'Enter'].indexOf(e.key) >= 0) { show(index + 1); e.preventDefault(); }
+    else if (['ArrowLeft', 'PageUp', 'Backspace'].indexOf(e.key) >= 0) { show(index - 1); e.preventDefault(); }
+    else if (e.key === 'Home') show(0);
+    else if (e.key === 'End') show(slides.length - 1);
+    else if (e.key === 'n' || e.key === 'N') notes.classList.toggle('show');
+    else if (e.key === 'f' || e.key === 'F') {
+      if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen();
+    }
+  });
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#notes') || e.target.closest('a')) return;
+    show(e.clientX < window.innerWidth / 3 ? index - 1 : index + 1);
+  });
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function () { show(fromHash()); });
+  fit();
+  show(fromHash());
+})();
+</script>
+</body>
+</html>

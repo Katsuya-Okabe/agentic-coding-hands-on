@@ -1,0 +1,3 @@
+@vibe-order/docs/design/system-design.md と @vibe-order/packages/shared/docs/design.md を元に、packages/shared/ 部分の実装計画を検討してください。
+各イテレーションで細かく品質確認をしながら着実に進めるプランを取ってください。
+TDD で進めるため、各イテレーションで「先に書くテスト」と「完了条件（実行するコマンド）」を明記してください。

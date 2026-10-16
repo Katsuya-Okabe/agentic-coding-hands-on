@@ -1,0 +1,5 @@
+@vibe-order/docs/design/system-design.md と @vibe-order/packages/【shared / backend / frontend】/docs/design.md を元に、packages/【shared / backend / frontend】/ 部分の実装を続けます。
+保存済みの計画は @vibe-order/docs/plans/【計画ファイル名】 です。
+途中までは実装できており、状況は下に書きます。まず現状を確認し、残りの作業計画を提示してください。
+---
+【前のセッションの完了報告、または git log / npm run test の結果を貼り付ける】

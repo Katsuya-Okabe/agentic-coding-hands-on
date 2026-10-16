@@ -1,1 +1,0 @@
-/deep-planning @/docs/design/implementation_plan_vibe_order.md を元に、Dev環境へのAWS環境への継続的デプロイの計画を考えてください。CI/CDを見越したnpmスクリプトやGitHub Actionsを整備するイテレーティブな計画としてください。

@@ -1,1 +1,0 @@
-/deep-planning  https://d11llt9ud6ln2i.cloudfront.net/ についてサインインが成功しました。サインイン後の画面をe2eテストを実装する計画を立ててください。

@@ -1,0 +1,26 @@
+vibe-order/ ディレクトリに、以下の要件を満たす npm workspaces のモノレポ雛形を作りたいです。
+まだ実装はせず、イテレーティブな構築計画を立ててください。各イテレーションの完了条件（実行して確認するコマンド）も明記してください。
+
+- 以下のフォルダ構成で管理される
+  - packages/shared/
+    - Zod スキーマと型（frontend と backend で共有）
+  - packages/backend/
+    - Hono（@hono/node-server で Node.js 上で動かす）
+  - packages/frontend/
+    - React, Vite, Tailwind CSS, Playwright
+- 想定される基本的な技術スタック
+  - TypeScript
+  - Biome（Formatter / Linter）
+  - Vitest（カバレッジ取得を含む）
+  - Zod
+- ルートの npm scripts
+  - `npm run check`：全パッケージの Format / Lint チェック
+  - `npm run test`：全パッケージのテスト
+  - `npm run build`：全パッケージのビルド
+- 開発環境の安全性
+  - Husky + lint-staged（コミット前に check とテスト）
+  - gitleaks（秘密情報のコミット防止）
+  - GitHub Actions による CI（push と pull request で check / test / build を実行）
+    - ワークフローはリポジトリルートの .github/workflows/ に置き、working-directory は vibe-order とする
+- 実行環境は GitHub Codespaces（Node.js 24）
+- 各パッケージに最小のサンプルコードとテストを1つずつ置き、CI が通ることを確認する
