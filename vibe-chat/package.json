@@ -1,0 +1,15 @@
+{
+  "name": "vibe-chat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "チームの生産性と創造性を加速させる次世代コラボレーションハブ",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}

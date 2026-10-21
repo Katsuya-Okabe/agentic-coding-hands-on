@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vibe Chat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ログイン -->
+  <div id="login" class="overlay">
+    <form id="login-form" class="card">
+      <h1>⚡ Vibe Chat</h1>
+      <p class="muted">チームの生産性と創造性を加速させる次世代コラボレーションハブ</p>
+      <input id="login-name" placeholder="表示名" maxlength="32" autofocus required>
+      <button type="submit" class="primary">はじめる</button>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <!-- サイドバー -->
+    <aside id="sidebar">
+      <div id="me" class="me">
+        <div class="me-row">
+          <span id="me-dot" class="dot"></span>
+          <strong id="me-name"></strong>
+          <button id="edit-status" class="ghost small" title="ステータスを編集">✏️</button>
+        </div>
+        <div id="me-status" class="muted small-text"></div>
+      </div>
+
+      <section>
+        <ul>
+          <li id="open-favorites" data-view="favorites">⭐ お気に入り <span id="fav-count" class="muted small-text"></span></li>
+        </ul>
+      </section>
+      <section>
+        <header>チャンネル <button id="add-channel" class="ghost small" title="チャンネルを作成">＋</button></header>
+        <ul id="channel-list"></ul>
+      </section>
+      <section>
+        <header>グループ <button id="add-group" class="ghost small" title="グループを作成">＋</button></header>
+        <ul id="group-list"></ul>
+      </section>
+      <section>
+        <header>メンバー</header>
+        <ul id="user-list"></ul>
+      </section>
+    </aside>
+
+    <!-- メイン -->
+    <main id="main">
+      <header class="main-header">
+        <h2 id="channel-title"></h2>
+        <span id="channel-sub" class="muted"></span>
+        <div class="spacer"></div>
+        <button id="open-pins" class="ghost" data-view="pins" title="このチャンネルのピン留め">📌 <span id="pin-count">0</span></button>
+        <button id="new-doc" class="ghost">📝 ドキュメントを作成</button>
+      </header>
+      <div id="messages"></div>
+      <form id="composer" class="composer">
+        <label class="ghost icon-btn" title="ファイルを添付">📎<input id="file-input" type="file" multiple hidden></label>
+        <textarea id="input" rows="1" placeholder="メッセージを送信（Enter で送信 / Shift+Enter で改行）"></textarea>
+        <button type="submit" class="primary">送信</button>
+      </form>
+      <div id="drop" class="drop" hidden>ここにドロップして共有</div>
+    </main>
+
+    <!-- 右パネル（スレッド / ドキュメント） -->
+    <aside id="panel" hidden>
+      <header class="panel-header">
+        <strong id="panel-title"></strong>
+        <div class="spacer"></div>
+        <button id="panel-close" class="ghost small">✕</button>
+      </header>
+      <div id="panel-body"></div>
+    </aside>
+  </div>
+
+  <!-- ステータス編集 -->
+  <dialog id="status-dialog">
+    <form method="dialog" id="status-form">
+      <h3>ステータス</h3>
+      <label>状態
+        <select id="status-select">
+          <option value="online">🟢 オンライン</option>
+          <option value="away">🟡 離席中</option>
+          <option value="busy">🔴 取り込み中</option>
+        </select>
+      </label>
+      <label>カスタムステータス
+        <input id="custom-status" placeholder="例: 🍜 ランチ中" maxlength="80">
+      </label>
+      <h3>フロー</h3>
+      <div id="flow-options" class="flow-options"></div>
+      <label>詳細
+        <input id="flow-detail" placeholder="例: 新機能の名前" maxlength="80">
+      </label>
+      <div class="actions">
+        <button value="cancel" class="ghost">キャンセル</button>
+        <button value="save" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- グループ作成 -->
+  <dialog id="group-dialog">
+    <form method="dialog">
+      <h3>グループチャットを作成</h3>
+      <label>グループ名 <input id="group-name" placeholder="例: デザインチーム"></label>
+      <div id="group-members" class="checklist"></div>
+      <div class="actions">
+        <button value="cancel" class="ghost">キャンセル</button>
+        <button value="create" class="primary">作成</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- プレビュー -->
+  <dialog id="preview-dialog" class="preview">
+    <form method="dialog" class="preview-head">
+      <strong id="preview-title"></strong>
+      <div class="spacer"></div>
+      <a id="preview-download" class="ghost" download>⬇ ダウンロード</a>
+      <button class="ghost small">✕</button>
+    </form>
+    <div id="preview-body"></div>
+  </dialog>
+
+  <script src="markdown.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
