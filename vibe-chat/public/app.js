@@ -14,6 +14,7 @@
 
   const state = {
     you: null,
+    limits: { nameMax: 20, dmMax: 3, reactions: [] },
     users: [],
     channels: new Map(),
     messages: [],
@@ -22,8 +23,11 @@
     favorites: new Set(), // 自分がお気に入りにしたメッセージ ID
     reads: {}, // channelId -> { name: 最後に読んだメッセージの時刻 }
     mentions: new Map(), // channelId -> 未読メンション数
-    panel: null, // { type: "thread" | "doc" | "favorites" | "pins", id }
+    panel: null, // { type: "doc" | "favorites" | "pins", id }
     unread: new Map(),
+    expanded: new Set(), // 返信を開いているスレッドの親メッセージ ID
+    editing: null, // 編集中のメッセージ ID
+    drafts: {}, // "reply:<id>" / "edit:<id>" -> 入力途中の文字列
     clientId: Math.random().toString(36).slice(2),
   };
 
@@ -33,14 +37,20 @@
   // ---------- 接続 ----------
   function connect(name) {
     pendingName = name;
+    if (ws) {
+      ws.onclose = null;
+      ws.close();
+    }
     const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${proto}://${location.host}/ws`);
-    ws.addEventListener("open", () => sendWs({ type: "join", name }));
-    ws.addEventListener("message", (e) => handle(JSON.parse(e.data)));
-    ws.addEventListener("close", () => {
+    const socket = new WebSocket(`${proto}://${location.host}/ws`);
+    ws = socket;
+    socket.onopen = () => sendWs({ type: "join", name });
+    socket.onmessage = (e) => handle(JSON.parse(e.data));
+    socket.onclose = () => {
+      if (!pendingName) return;
       toast("接続が切れました。再接続しています…");
       setTimeout(() => connect(pendingName), 1500);
-    });
+    };
   }
 
   function sendWs(payload) {
@@ -50,7 +60,11 @@
   function handle(data) {
     switch (data.type) {
       case "init":
+        // 名前を変えたときも init が届くので、再接続用の名前を更新しておく
         state.you = data.you;
+        pendingName = data.you;
+        try { localStorage.setItem("vibe-chat-name", data.you); } catch {}
+        state.limits = data.limits || state.limits;
         state.users = data.users;
         state.channels = new Map(data.channels.map((c) => [c.id, c]));
         state.messages = data.messages;
@@ -58,6 +72,7 @@
         state.favorites = new Set(data.favorites || []);
         state.reads = data.reads || {};
         if (!state.channels.has(state.current)) state.current = "general";
+        if (state.editing && !state.messages.some((m) => m.id === state.editing)) state.editing = null;
         $("#login").hidden = true;
         $("#app").hidden = false;
         renderAll();
@@ -98,6 +113,11 @@
         openPanel("doc", data.docId);
         break;
       case "error":
+        if (data.code === "join") {
+          // ログインに失敗したら再接続せず、ログイン画面に戻す
+          pendingName = null;
+          ws.close();
+        }
         toast(data.message);
         break;
     }
@@ -106,6 +126,7 @@
   // ---------- ヘルパー ----------
   const me = () => state.users.find((u) => u.name === state.you) || {};
   const userByName = (name) => state.users.find((u) => u.name === name);
+  const isOneOnOne = (c) => c.kind === "dm" && c.members.length <= 2;
 
   function colorFor(name) {
     let h = 0;
@@ -131,9 +152,25 @@
     return `${f.icon} ${f.label}${d ? `：${d}` : ""}`;
   }
 
+  function dmOthers(c) {
+    const others = c.members.filter((n) => n !== state.you);
+    return others.length ? others : [state.you];
+  }
+
   function channelLabel(c) {
-    if (c.kind === "dm") return c.members.find((n) => n !== state.you) || state.you;
+    if (c.kind === "dm") return dmOthers(c).join("、");
     return c.name;
+  }
+
+  function channelPlace(c) {
+    if (!c) return "";
+    return c.kind === "public" ? `#${c.name}` : channelLabel(c);
+  }
+
+  // 1対1の DM（自分あての DM を含む）を探す
+  function dmWith(name) {
+    const key = [...new Set([state.you, name])].sort().join("\n");
+    return [...state.channels.values()].find((c) => c.kind === "dm" && [...c.members].sort().join("\n") === key);
   }
 
   function formatTime(ts) {
@@ -218,32 +255,32 @@
   function renderSidebar() {
     renderMe();
     const chans = [...state.channels.values()];
+    const item = (c, icon) =>
+      `<li class="${c.id === state.current ? "active" : ""}" data-channel="${esc(c.id)}">${icon} ${esc(channelLabel(c))}${badge(c.id)}</li>`;
 
     const favCount = favoriteMessages().length;
     $("#fav-count").textContent = favCount ? `(${favCount})` : "";
     $("#open-favorites").classList.toggle("active", !!state.panel && state.panel.type === "favorites");
 
-    $("#channel-list").innerHTML = chans
-      .filter((c) => c.kind === "public")
-      .map((c) => `<li class="${c.id === state.current ? "active" : ""}" data-channel="${esc(c.id)}"># ${esc(c.name)}${badge(c.id)}</li>`)
-      .join("");
+    $("#channel-list").innerHTML = chans.filter((c) => c.kind === "public").map((c) => item(c, "#")).join("");
+
+    $("#dm-list").innerHTML =
+      chans.filter((c) => c.kind === "dm" && !isOneOnOne(c)).map((c) => item(c, "💬")).join("") ||
+      '<li class="muted empty">「＋」で3人までの DM を作れます</li>';
 
     $("#group-list").innerHTML =
-      chans
-        .filter((c) => c.kind === "group")
-        .map((c) => `<li class="${c.id === state.current ? "active" : ""}" data-channel="${esc(c.id)}">👥 ${esc(c.name)}${badge(c.id)}</li>`)
-        .join("") || '<li class="muted empty">まだありません</li>';
+      chans.filter((c) => c.kind === "group").map((c) => item(c, "👥")).join("") || '<li class="muted empty">まだありません</li>';
 
     const sorted = [...state.users].sort((a, b) => (b.online - a.online) || a.name.localeCompare(b.name));
     $("#user-list").innerHTML = sorted
       .map((u) => {
-        const dmId = `dm:${[state.you, u.name].sort().join(":")}`;
-        const active = dmId === state.current ? "active" : "";
+        const dm = dmWith(u.name);
+        const active = dm && dm.id === state.current ? "active" : "";
         const sub = [u.customStatus ? esc(u.customStatus) : "", flowText(u.flow)].filter(Boolean).join(" · ");
         return `<li class="user ${active}" data-user="${esc(u.name)}">
           <span class="${dotClass(u)}"></span>
           <div class="user-info">
-            <div>${u.bot ? "🤖 " : ""}${esc(u.name)}${u.name === state.you ? ' <span class="muted">(あなた)</span>' : ""}${u.bot ? ' <span class="muted">(ボット)</span>' : ""}${badge(dmId)}</div>
+            <div>${u.bot ? "🤖 " : ""}${esc(u.name)}${u.name === state.you ? ' <span class="muted">(あなた)</span>' : ""}${u.bot ? ' <span class="muted">(ボット)</span>' : ""}${dm ? badge(dm.id) : ""}</div>
             ${sub ? `<div class="muted small-text">${sub}</div>` : ""}
           </div>
         </li>`;
@@ -254,11 +291,16 @@
   function renderHeader() {
     const c = state.channels.get(state.current);
     if (!c) return;
-    if (c.kind === "dm") {
+    if (isOneOnOne(c)) {
       const other = userByName(channelLabel(c));
       $("#channel-title").innerHTML = `<span class="${dotClass(other)}"></span> ${esc(channelLabel(c))}`;
       const sub = other ? [other.online ? STATUS_LABEL[other.status] : "オフライン", other.customStatus && esc(other.customStatus), flowText(other.flow)] : [];
       $("#channel-sub").innerHTML = sub.filter(Boolean).join(" · ");
+    } else if (c.kind === "dm") {
+      $("#channel-title").textContent = `💬 ${channelLabel(c)}`;
+      $("#channel-sub").innerHTML =
+        `グループ DM（${c.members.length}人）· ` +
+        c.members.map((n) => `<span class="${dotClass(userByName(n))}"></span> ${esc(n)}`).join("　");
     } else if (c.kind === "group") {
       $("#channel-title").textContent = `👥 ${c.name}`;
       $("#channel-sub").textContent = c.members.join(", ");
@@ -266,7 +308,7 @@
       $("#channel-title").textContent = `# ${c.name}`;
       $("#channel-sub").textContent = "全員が参加できるチャンネル";
     }
-    $("#input").placeholder = `${c.kind === "public" ? "#" : ""}${channelLabel(c)} へメッセージを送信（Enter で送信 / Shift+Enter で改行）`;
+    $("#input").placeholder = `${channelPlace(c)} へメッセージを送信（Enter で送信 / Shift+Enter で改行）`;
     $("#pin-count").textContent = pinnedMessages(c.id).length;
   }
 
@@ -282,39 +324,94 @@
     return state.messages.filter((m) => m.parentId === parentId);
   }
 
-  function messageHtml(m, { inThread = false } = {}) {
-    let body = m.text ? `<div class="text">${renderText(m.text, m.mentions || [])}</div>` : "";
-    if (m.file) body += fileHtml(m.file);
-    if (m.docId) {
-      const doc = state.docs.get(m.docId);
-      body += `<div class="doc-card" data-doc="${esc(m.docId)}">
-        <span class="doc-icon">📝</span>
-        <div><strong>${esc(doc ? doc.title : "ドキュメント")}</strong>
-        <div class="muted small-text">共同編集ドキュメント · クリックで開く</div></div>
+  function reactionsHtml(m) {
+    const entries = Object.entries(m.reactions || {});
+    if (!entries.length) return "";
+    return `<div class="reactions">${entries
+      .map(([emoji, names]) => {
+        const mine = names.includes(state.you) ? "mine" : "";
+        return `<button class="reaction ${mine}" data-react="${esc(emoji)}" data-msg="${esc(m.id)}" title="${esc(names.join("、"))}">${emoji} <span>${names.length}</span></button>`;
+      })
+      .join("")}</div>`;
+  }
+
+  function threadHtml(m) {
+    const r = replies(m.id);
+    const open = state.expanded.has(m.id);
+    if (!r.length && !open) return "";
+    let toggle;
+    if (open) {
+      toggle = `<button class="thread-toggle" data-toggle-thread="${esc(m.id)}">▼ ${r.length ? `${r.length}件の返信を閉じる` : "閉じる"}</button>`;
+    } else {
+      const people = [...new Set(r.map((x) => x.author))].slice(0, 4).map(avatar).join("");
+      const last = r[r.length - 1];
+      toggle = `<button class="thread-toggle" data-toggle-thread="${esc(m.id)}">▶ ${people} <strong>${r.length}件の返信</strong>
+        <span class="muted small-text">最終返信 ${formatTime(last.createdAt)}</span></button>`;
+    }
+    if (!open) return toggle;
+    const body = r.length ? r.map((x) => messageHtml(x, { context: "reply" })).join("") : '<div class="muted small-text thread-empty">まだ返信はありません</div>';
+    return `${toggle}
+      <div class="thread-inline">
+        ${body}
+        <form class="composer reply-composer" data-reply-form="${esc(m.id)}">
+          <textarea rows="1" data-draft="reply:${esc(m.id)}" placeholder="スレッドに返信"></textarea>
+          <button class="primary small">返信</button>
+        </form>
+      </div>`;
+  }
+
+  // context: "main"（チャンネル）/ "reply"（スレッド内の返信）/ "list"（お気に入り・ピン留めの一覧）
+  function messageHtml(m, { context = "main" } = {}) {
+    const mine = m.author === state.you;
+    const editing = context !== "list" && state.editing === m.id;
+    let body;
+    if (m.deleted) {
+      body = '<div class="text deleted">このメッセージは削除されました</div>';
+    } else if (editing) {
+      body = `<form class="edit-form" data-edit-form="${esc(m.id)}">
+        <textarea rows="2" data-draft="edit:${esc(m.id)}"></textarea>
+        <div class="edit-actions muted small-text">Enter で保存 · Esc でキャンセル
+          <button type="button" class="ghost small" data-edit-cancel>キャンセル</button>
+          <button class="primary small">保存</button>
+        </div>
+      </form>`;
+    } else {
+      body = m.text ? `<div class="text">${renderText(m.text, m.mentions || [])}</div>` : "";
+      if (m.file) body += fileHtml(m.file);
+      if (m.docId) {
+        const doc = state.docs.get(m.docId);
+        body += `<div class="doc-card" data-doc="${esc(m.docId)}">
+          <span class="doc-icon">📝</span>
+          <div><strong>${esc(doc ? doc.title : "ドキュメント")}</strong>
+          <div class="muted small-text">共同編集ドキュメント · クリックで開く</div></div>
+        </div>`;
+      }
+      body += reactionsHtml(m);
+    }
+
+    const fav = state.favorites.has(m.id);
+    let actions = "";
+    if (!m.deleted && !editing) {
+      const canEdit = mine && context !== "list" && !(userByName(m.author) || {}).bot;
+      actions = `<div class="msg-actions">
+        <button class="ghost small" data-react-picker="${esc(m.id)}" title="リアクション">😊</button>
+        <button class="ghost small ${fav ? "on" : ""}" data-fav="${esc(m.id)}" title="${fav ? "お気に入りから外す" : "お気に入りに追加"}">${fav ? "★" : "☆"}</button>
+        <button class="ghost small ${m.pinned ? "on" : ""}" data-pin="${esc(m.id)}" title="${m.pinned ? "ピン留めを外す" : "チャンネルにピン留め"}">📌</button>
+        ${context === "main" ? `<button class="ghost small" data-reply="${esc(m.id)}" title="スレッドで返信">💬 返信</button>` : ""}
+        ${canEdit ? `<button class="ghost small" data-edit="${esc(m.id)}" title="編集">✏️</button>
+        <button class="ghost small" data-delete="${esc(m.id)}" title="削除">🗑</button>` : ""}
       </div>`;
     }
-    let thread = "";
-    if (!inThread && !m.parentId) {
-      const r = replies(m.id);
-      if (r.length) {
-        const people = [...new Set(r.map((x) => x.author))].slice(0, 4).map(avatar).join("");
-        thread = `<button class="thread-link" data-thread="${esc(m.id)}">${people} 💬 ${r.length}件の返信</button>`;
-      }
-    }
-    const fav = state.favorites.has(m.id);
-    const actions = `<div class="msg-actions">
-      <button class="ghost small ${fav ? "on" : ""}" data-fav="${esc(m.id)}" title="${fav ? "お気に入りから外す" : "お気に入りに追加"}">${fav ? "★" : "☆"}</button>
-      <button class="ghost small ${m.pinned ? "on" : ""}" data-pin="${esc(m.id)}" title="${m.pinned ? "ピン留めを外す" : "チャンネルにピン留め"}">📌</button>
-      ${!inThread ? `<button class="ghost small" data-thread="${esc(m.id)}" title="スレッドで返信">💬 返信</button>` : ""}
-    </div>`;
+
     const marks = [
+      m.editedAt && !m.deleted ? '<span class="muted small-text">(編集済み)</span>' : "",
       fav ? '<span class="fav-mark" title="お気に入り">★</span>' : "",
       m.pinned ? `<span class="pin-mark">📌 ${esc(m.pinned.by)} がピン留め</span>` : "",
     ].join("");
     const r = readers(m);
-    const dm = (state.channels.get(m.channelId) || {}).kind === "dm";
-    const receipt = r.length
-      ? `<span class="read-receipt" title="既読: ${esc(r.join("、"))}">${dm ? "既読" : `既読 ${r.length}`}</span>`
+    const c = state.channels.get(m.channelId) || {};
+    const receipt = r.length && !m.deleted
+      ? `<span class="read-receipt" title="既読: ${esc(r.join("、"))}">${c.kind && isOneOnOne(c) ? "既読" : `既読 ${r.length}`}</span>`
       : "";
     const classes = ["message", m.pinned ? "pinned" : "", (m.mentions || []).includes(state.you) ? "mentioned" : ""].join(" ");
     return `<div class="${classes}" data-id="${esc(m.id)}">
@@ -322,7 +419,7 @@
       <div class="msg-main">
         <div class="msg-head"><strong>${esc(m.author)}</strong><span class="muted small-text">${formatTime(m.createdAt)}</span>${marks}${receipt}</div>
         ${body}
-        ${thread}
+        ${context === "main" ? threadHtml(m) : ""}
       </div>
       ${actions}
     </div>`;
@@ -340,12 +437,96 @@
   function renderMessages() {
     const list = state.messages.filter((m) => m.channelId === state.current && !m.parentId);
     const box = $("#messages");
+    // data-channel はサイドバーのクリック判定に使うので、ここでは別の名前で覚えておく
+    const sameChannel = box.dataset.renderedChannel === state.current;
     const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    const prevScroll = box.scrollTop;
+
+    // 描き直すと入力欄が作り直されるので、フォーカスとカーソル位置を覚えておく
+    const active = document.activeElement;
+    const focusKey = active && box.contains(active) && active.dataset.draft;
+    const sel = focusKey ? [active.selectionStart, active.selectionEnd] : null;
+
     box.innerHTML = list.length
       ? list.map((m) => messageHtml(m)).join("")
       : `<div class="empty-state">まだメッセージはありません。最初のひとことをどうぞ 👋<br><span class="muted">ファイルはドラッグ＆ドロップで共有できます</span></div>`;
-    if (nearBottom || box.dataset.channel !== state.current) box.scrollTop = box.scrollHeight;
-    box.dataset.channel = state.current;
+
+    for (const ta of box.querySelectorAll("textarea[data-draft]")) setupDraft(ta);
+    if (focusKey) {
+      const ta = box.querySelector(`textarea[data-draft="${CSS.escape(focusKey)}"]`);
+      if (ta) {
+        ta.focus();
+        ta.setSelectionRange(...sel);
+        if (ac && ac.key === focusKey) ac.textarea = ta;
+      }
+    }
+
+    if (!sameChannel || nearBottom) box.scrollTop = box.scrollHeight;
+    else box.scrollTop = prevScroll;
+    box.dataset.renderedChannel = state.current;
+  }
+
+  // スレッドの返信欄と編集欄。入力途中の内容は描き直しても残す
+  function setupDraft(ta) {
+    const key = ta.dataset.draft;
+    const [kind, id] = key.split(/:(.*)/s);
+    if (key in state.drafts) ta.value = state.drafts[key];
+    else if (kind === "edit") ta.value = state.drafts[key] = (state.messages.find((m) => m.id === id) || {}).text || "";
+    ta.addEventListener("input", () => (state.drafts[key] = ta.value));
+    ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+    if (kind === "reply") bindEnterToSend(ta, () => sendReply(id), key);
+    else {
+      bindEnterToSend(ta, () => saveEdit(id), key);
+      ta.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !ac) cancelEdit();
+      });
+    }
+  }
+
+  function sendReply(parentId) {
+    const key = `reply:${parentId}`;
+    const text = state.drafts[key] || "";
+    if (!text.trim()) return;
+    const parent = state.messages.find((m) => m.id === parentId);
+    if (!parent) return;
+    sendWs({ type: "message", channelId: parent.channelId, parentId, text });
+    delete state.drafts[key];
+    renderMessages();
+    const ta = $(`textarea[data-draft="${CSS.escape(key)}"]`);
+    if (ta) ta.focus();
+  }
+
+  function startEdit(id) {
+    state.editing = id;
+    delete state.drafts[`edit:${id}`];
+    renderMessages();
+    const ta = $(`textarea[data-draft="edit:${CSS.escape(id)}"]`);
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }
+
+  function saveEdit(id) {
+    const text = state.drafts[`edit:${id}`] ?? "";
+    const m = state.messages.find((x) => x.id === id);
+    if (!m) return cancelEdit();
+    if (!text.trim() && !m.file && !m.docId) return toast("空のメッセージにはできません。消す場合は 🗑 で削除してください");
+    if (text !== m.text) sendWs({ type: "edit", messageId: id, text });
+    cancelEdit();
+  }
+
+  function cancelEdit() {
+    if (state.editing) delete state.drafts[`edit:${state.editing}`];
+    state.editing = null;
+    closeMention();
+    renderMessages();
+  }
+
+  function toggleThread(id, open = !state.expanded.has(id)) {
+    if (open) state.expanded.add(id);
+    else state.expanded.delete(id);
+    renderMessages();
   }
 
   // ---------- 右パネル ----------
@@ -366,12 +547,10 @@
       return;
     }
     panel.hidden = false;
-    if (state.panel.type === "thread") renderThread();
-    else if (state.panel.type === "favorites") renderList("⭐ お気に入り", favoriteMessages(), "まだお気に入りはありません。メッセージの ☆ を押すと追加できます。");
+    if (state.panel.type === "favorites") renderList("⭐ お気に入り", favoriteMessages(), "まだお気に入りはありません。メッセージの ☆ を押すと追加できます。");
     else if (state.panel.type === "pins") {
       const c = state.channels.get(state.current);
-      const where = c.kind === "public" ? `#${c.name}` : channelLabel(c);
-      renderList(`📌 ${where} のピン留め`, pinnedMessages(c.id), "まだピン留めはありません。メッセージの 📌 を押すと、チャンネルの全員に共有されます。");
+      renderList(`📌 ${channelPlace(c)} のピン留め`, pinnedMessages(c.id), "まだピン留めはありません。メッセージの 📌 を押すと、チャンネルの全員に共有されます。");
     } else renderDoc();
   }
 
@@ -379,14 +558,12 @@
   function renderList(title, list, emptyText) {
     $("#panel-title").textContent = title;
     $("#panel-body").innerHTML = list.length
-      ? `<div class="thread">${list
+      ? `<div class="panel-list">${list
           .map((m) => {
-            const c = state.channels.get(m.channelId);
-            const where = c ? (c.kind === "public" ? `#${esc(c.name)}` : esc(channelLabel(c))) : "";
             const reply = m.parentId ? " · スレッドの返信" : "";
             return `<div class="list-item" data-jump="${esc(m.id)}">
-              <div class="muted small-text list-where">${where}${reply}</div>
-              ${messageHtml(m, { inThread: true })}
+              <div class="muted small-text list-where">${esc(channelPlace(state.channels.get(m.channelId)))}${reply}</div>
+              ${messageHtml(m, { context: "list" })}
             </div>`;
           })
           .join("")}</div>`
@@ -402,46 +579,15 @@
       state.mentions.delete(m.channelId);
       renderSidebar();
       renderHeader();
-      renderMessages();
       markRead();
     }
-    if (m.parentId) return openPanel("thread", m.parentId);
+    if (m.parentId) state.expanded.add(m.parentId);
+    renderMessages();
     const el = document.querySelector(`#messages .message[data-id="${CSS.escape(m.id)}"]`);
     if (!el) return;
     el.scrollIntoView({ block: "center", behavior: "smooth" });
     el.classList.add("highlight");
     setTimeout(() => el.classList.remove("highlight"), 1600);
-  }
-
-  function renderThread() {
-    const parent = state.messages.find((m) => m.id === state.panel.id);
-    if (!parent) return closePanel();
-    $("#panel-title").textContent = "スレッド";
-    const body = $("#panel-body");
-    const existing = body.querySelector("#thread-input");
-    const draft = existing ? existing.value : "";
-    body.innerHTML = `
-      <div class="thread">
-        ${messageHtml(parent, { inThread: true })}
-        <div class="thread-divider">${replies(parent.id).length}件の返信</div>
-        ${replies(parent.id).map((m) => messageHtml(m, { inThread: true })).join("")}
-      </div>
-      <form id="thread-form" class="composer">
-        <textarea id="thread-input" rows="1" placeholder="スレッドに返信"></textarea>
-        <button class="primary">返信</button>
-      </form>`;
-    const input = body.querySelector("#thread-input");
-    input.value = draft;
-    const thread = body.querySelector(".thread");
-    thread.scrollTop = thread.scrollHeight;
-    body.querySelector("#thread-form").addEventListener("submit", (e) => {
-      e.preventDefault();
-      if (!input.value.trim()) return;
-      sendWs({ type: "message", channelId: parent.channelId, parentId: parent.id, text: input.value });
-      input.value = "";
-    });
-    bindEnterToSend(input, () => body.querySelector("#thread-form").requestSubmit());
-    if (existing) input.focus();
   }
 
   let docTimer = null;
@@ -511,7 +657,6 @@
       renderMessages();
       markRead();
     }
-    if (state.panel && state.panel.type === "thread" && (m.parentId === state.panel.id || m.id === state.panel.id)) renderThread();
     renderSidebar();
   }
 
@@ -519,6 +664,7 @@
     const i = state.messages.findIndex((x) => x.id === m.id);
     if (i === -1) return;
     state.messages[i] = m;
+    if (m.deleted && state.editing === m.id) state.editing = null;
     if (m.channelId === state.current) {
       renderMessages();
       renderHeader();
@@ -530,8 +676,7 @@
     const flow = me().flow;
     if (flow && flow.kind === "focus") return; // 集中モード中は通知しない
     if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const c = state.channels.get(m.channelId);
-    const where = c ? (c.kind === "public" ? `#${c.name}` : channelLabel(c)) : "";
+    const where = channelPlace(state.channels.get(m.channelId));
     const text = m.text || (m.file ? `📎 ${m.file.name}` : "📝 ドキュメント");
     const title = (m.mentions || []).includes(state.you) ? `${m.author} からメンション（${where}）` : `${m.author}（${where}）`;
     new Notification(title, { body: text.slice(0, 120) });
@@ -543,11 +688,34 @@
     state.current = id;
     state.unread.delete(id);
     state.mentions.delete(id);
+    state.editing = null;
     closeMention();
-    if (state.panel && ["thread", "pins"].includes(state.panel.type)) state.panel = null;
+    closeReactionPicker();
+    if (state.panel && state.panel.type === "pins") state.panel = null;
     renderAll();
     markRead();
     $("#input").focus();
+  }
+
+  // ---------- リアクション ----------
+  const picker = document.createElement("div");
+  picker.id = "reaction-picker";
+  picker.hidden = true;
+  document.body.appendChild(picker);
+
+  function openReactionPicker(button, messageId) {
+    picker.innerHTML = state.limits.reactions
+      .map((emoji) => `<button class="ghost" data-pick-emoji="${esc(emoji)}" data-msg="${esc(messageId)}">${emoji}</button>`)
+      .join("");
+    picker.hidden = false;
+    const rect = button.getBoundingClientRect();
+    const width = picker.offsetWidth;
+    picker.style.left = `${Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8))}px`;
+    picker.style.top = `${rect.bottom + 4 + picker.offsetHeight > window.innerHeight ? rect.top - picker.offsetHeight - 4 : rect.bottom + 4}px`;
+  }
+
+  function closeReactionPicker() {
+    picker.hidden = true;
   }
 
   // ---------- メンションの入力補完 ----------
@@ -555,7 +723,7 @@
   popup.id = "mention-popup";
   popup.hidden = true;
   document.body.appendChild(popup);
-  let ac = null; // { textarea, start, end, items, index }
+  let ac = null; // { textarea, key, start, end, items, index }
 
   function mentionCandidates() {
     const c = state.channels.get(state.current);
@@ -564,7 +732,7 @@
     return names.filter((n) => n !== state.you);
   }
 
-  function updateMention(textarea) {
+  function updateMention(textarea, key) {
     const caret = textarea.selectionStart;
     const m = textarea.value.slice(0, caret).match(/(?:^|\s)[@＠]([^\s@＠]*)$/);
     if (!m) return closeMention();
@@ -574,8 +742,8 @@
       .sort((a, b) => b.toLowerCase().startsWith(q) - a.toLowerCase().startsWith(q) || a.localeCompare(b))
       .slice(0, 8);
     if (!items.length) return closeMention();
-    const keep = ac && ac.textarea === textarea ? Math.min(ac.index, items.length - 1) : 0;
-    ac = { textarea, start: caret - m[1].length - 1, end: caret, items, index: keep };
+    const keep = ac && ac.key === key ? Math.min(ac.index, items.length - 1) : 0;
+    ac = { textarea, key, start: caret - m[1].length - 1, end: caret, items, index: keep };
     renderMention();
   }
 
@@ -592,7 +760,7 @@
           </div>`;
         })
         .join("");
-    const rect = ac.textarea.closest(".composer").getBoundingClientRect();
+    const rect = (ac.textarea.closest(".composer, .edit-form") || ac.textarea).getBoundingClientRect();
     popup.style.left = `${rect.left}px`;
     popup.style.bottom = `${window.innerHeight - rect.top + 6}px`;
     popup.style.width = `${Math.min(320, rect.width)}px`;
@@ -606,6 +774,7 @@
     const caret = start + insert.length;
     ta.setSelectionRange(caret, caret);
     ta.focus();
+    ta.dispatchEvent(new Event("input"));
     closeMention();
   }
 
@@ -614,9 +783,9 @@
     popup.hidden = true;
   }
 
-  function attachMention(textarea) {
-    textarea.addEventListener("input", () => updateMention(textarea));
-    textarea.addEventListener("click", () => updateMention(textarea));
+  function attachMention(textarea, key) {
+    textarea.addEventListener("input", () => updateMention(textarea, key));
+    textarea.addEventListener("click", () => updateMention(textarea, key));
     textarea.addEventListener("blur", () => setTimeout(() => ac && ac.textarea === textarea && closeMention(), 150));
     textarea.addEventListener("keydown", (e) => {
       if (!ac || ac.textarea !== textarea || e.isComposing) return;
@@ -629,7 +798,7 @@
       } else if (e.key === "Escape") {
         closeMention();
       } else return;
-      // 送信（Enter）より先に処理して止める
+      // 送信（Enter）やキャンセル（Esc）より先に処理して止める
       e.preventDefault();
       e.stopImmediatePropagation();
     });
@@ -642,8 +811,8 @@
     applyMention(Number(item.dataset.mentionIndex));
   });
 
-  function bindEnterToSend(textarea, submit) {
-    attachMention(textarea);
+  function bindEnterToSend(textarea, submit, key = "main") {
+    attachMention(textarea, key);
     textarea.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
         e.preventDefault();
@@ -692,8 +861,17 @@
     $("#preview-dialog").showModal();
   }
 
+  function updateNameCount() {
+    const n = [...$("#name-input").value.trim()].length;
+    $("#name-count").textContent = `${n} / ${state.limits.nameMax}`;
+    $("#name-count").classList.toggle("over", n > state.limits.nameMax);
+  }
+
   function openStatusDialog() {
     const u = me();
+    $("#name-input").value = state.you;
+    $("#name-input").maxLength = state.limits.nameMax;
+    updateNameCount();
     $("#status-select").value = u.status || "online";
     $("#custom-status").value = u.customStatus || "";
     $("#flow-detail").value = (u.flow && u.flow.detail) || "";
@@ -711,12 +889,28 @@
     $("#status-dialog").showModal();
   }
 
+  function openDMDialog() {
+    const max = state.limits.dmMax - 1;
+    $("#dm-hint").textContent = `相手を${max}人まで選べます（1人なら1対1の DM になります）`;
+    $("#dm-members").innerHTML =
+      state.users
+        .filter((u) => u.name !== state.you)
+        .map((u) => `<label><input type="checkbox" value="${esc(u.name)}"> <span class="${dotClass(u)}"></span> ${u.bot ? "🤖 " : ""}${esc(u.name)}</label>`)
+        .join("") || '<p class="muted">ほかのメンバーがまだいません</p>';
+    const boxes = [...document.querySelectorAll("#dm-members input")];
+    const limit = () => {
+      const count = boxes.filter((b) => b.checked).length;
+      for (const b of boxes) b.disabled = !b.checked && count >= max;
+    };
+    for (const b of boxes) b.addEventListener("change", limit);
+    $("#dm-dialog").showModal();
+  }
+
   // ---------- イベント ----------
   $("#login-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const name = $("#login-name").value.trim();
     if (!name) return;
-    try { localStorage.setItem("vibe-chat-name", name); } catch {}
     if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
     connect(name);
   });
@@ -735,6 +929,15 @@
     input.style.height = "auto";
   });
   bindEnterToSend($("#input"), () => $("#composer").requestSubmit());
+
+  // スレッドの返信欄と編集欄の「返信」「保存」ボタン
+  $("#messages").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const reply = e.target.closest("[data-reply-form]");
+    if (reply) return sendReply(reply.dataset.replyForm);
+    const edit = e.target.closest("[data-edit-form]");
+    if (edit) saveEdit(edit.dataset.editForm);
+  });
 
   $("#file-input").addEventListener("change", (e) => {
     uploadFiles([...e.target.files]);
@@ -763,16 +966,51 @@
 
   // クリック操作をまとめて処理
   document.addEventListener("click", (e) => {
-    const fav = e.target.closest("[data-fav]");
+    const t = e.target;
+
+    const pick = t.closest("[data-pick-emoji]");
+    if (pick) {
+      sendWs({ type: "react", messageId: pick.dataset.msg, emoji: pick.dataset.pickEmoji });
+      return closeReactionPicker();
+    }
+    const pickerBtn = t.closest("[data-react-picker]");
+    if (pickerBtn) return openReactionPicker(pickerBtn, pickerBtn.dataset.reactPicker);
+    closeReactionPicker();
+
+    const reaction = t.closest("[data-react]");
+    if (reaction) return sendWs({ type: "react", messageId: reaction.dataset.msg, emoji: reaction.dataset.react });
+
+    const fav = t.closest("[data-fav]");
     if (fav) return sendWs({ type: "favorite", messageId: fav.dataset.fav, on: !state.favorites.has(fav.dataset.fav) });
 
-    const pin = e.target.closest("[data-pin]");
+    const pin = t.closest("[data-pin]");
     if (pin) {
       const m = state.messages.find((x) => x.id === pin.dataset.pin);
       return sendWs({ type: "pin", messageId: pin.dataset.pin, on: !(m && m.pinned) });
     }
 
-    const view = e.target.closest("[data-view]");
+    const edit = t.closest("[data-edit]");
+    if (edit) return startEdit(edit.dataset.edit);
+    if (t.closest("[data-edit-cancel]")) return cancelEdit();
+
+    const del = t.closest("[data-delete]");
+    if (del) {
+      if (confirm("このメッセージを削除しますか？")) sendWs({ type: "delete", messageId: del.dataset.delete });
+      return;
+    }
+
+    const toggle = t.closest("[data-toggle-thread]");
+    if (toggle) return toggleThread(toggle.dataset.toggleThread);
+
+    const reply = t.closest("[data-reply]");
+    if (reply) {
+      toggleThread(reply.dataset.reply, true);
+      const ta = $(`textarea[data-draft="reply:${CSS.escape(reply.dataset.reply)}"]`);
+      if (ta) ta.focus();
+      return;
+    }
+
+    const view = t.closest("[data-view]");
     if (view) {
       const type = view.dataset.view;
       if (state.panel && state.panel.type === type) closePanel();
@@ -781,22 +1019,19 @@
     }
 
     // 一覧の中のファイルやドキュメントは、移動より先にそれ自体を開く
-    const jump = e.target.closest("[data-jump]");
-    if (jump && !e.target.closest("[data-file], [data-doc], [data-thread]")) return jumpTo(jump.dataset.jump);
+    const jump = t.closest("[data-jump]");
+    if (jump && !t.closest("[data-file], [data-doc]")) return jumpTo(jump.dataset.jump);
 
-    const ch = e.target.closest("[data-channel]");
+    const ch = t.closest("li[data-channel]");
     if (ch) return openChannel(ch.dataset.channel);
 
-    const user = e.target.closest("[data-user]");
+    const user = t.closest("[data-user]");
     if (user) return sendWs({ type: "openDM", with: user.dataset.user });
 
-    const thread = e.target.closest("[data-thread]");
-    if (thread) return openPanel("thread", thread.dataset.thread);
-
-    const doc = e.target.closest("[data-doc]");
+    const doc = t.closest("[data-doc]");
     if (doc) return openPanel("doc", doc.dataset.doc);
 
-    const file = e.target.closest("[data-file]");
+    const file = t.closest("[data-file]");
     if (file) return preview(JSON.parse(file.dataset.file));
   });
 
@@ -805,6 +1040,7 @@
     renderSidebar();
   });
   $("#edit-status").addEventListener("click", openStatusDialog);
+  $("#name-input").addEventListener("input", updateNameCount);
 
   $("#status-dialog").addEventListener("close", () => {
     if ($("#status-dialog").returnValue !== "save") return;
@@ -815,11 +1051,21 @@
       customStatus: $("#custom-status").value,
       flow: { kind, detail: kind === "none" ? "" : $("#flow-detail").value },
     });
+    const name = $("#name-input").value.trim();
+    if (name && name !== state.you) sendWs({ type: "rename", name });
   });
 
   $("#add-channel").addEventListener("click", () => {
     const name = prompt("新しいチャンネル名");
     if (name) sendWs({ type: "createChannel", name });
+  });
+
+  $("#add-dm").addEventListener("click", openDMDialog);
+  $("#dm-dialog").addEventListener("close", () => {
+    if ($("#dm-dialog").returnValue !== "start") return;
+    const members = [...document.querySelectorAll("#dm-members input:checked")].map((i) => i.value);
+    if (!members.length) return toast("相手を1人以上選んでください");
+    sendWs({ type: "openDM", with: members });
   });
 
   $("#add-group").addEventListener("click", () => {
@@ -842,6 +1088,9 @@
     const title = prompt("ドキュメントのタイトル", "議事メモ");
     if (title !== null) sendWs({ type: "createDoc", channelId: state.current, title });
   });
+
+  window.addEventListener("resize", closeReactionPicker);
+  $("#messages").addEventListener("scroll", closeReactionPicker);
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) return;

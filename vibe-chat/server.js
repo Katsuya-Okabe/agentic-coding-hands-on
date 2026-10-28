@@ -9,6 +9,10 @@ const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
+const NAME_MAX = 20; // ユーザー名の最大文字数
+const DM_MAX = 3; // DM に参加できる最大人数（自分を含む）
+const REACTIONS = ["👍", "❤️", "😂", "🎉", "👀", "🙏", "🔥", "✅"];
+
 const app = express();
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/files", express.static(UPLOAD_DIR));
@@ -16,7 +20,7 @@ app.use("/files", express.static(UPLOAD_DIR));
 // ---- インメモリの状態 ----
 const users = new Map(); // name -> { name, status, customStatus, flow, favorites:Set, sockets:Set }
 const channels = new Map(); // id -> { id, name, kind: public|group|dm, members:[] | null }
-const messages = []; // { id, channelId, author, text, parentId, file, docId, pinned, createdAt }
+const messages = []; // { id, channelId, author, text, parentId, file, docId, pinned, mentions, reactions, editedAt, deleted, createdAt }
 const docs = new Map(); // id -> { id, channelId, title, content, version, updatedBy, updatedAt }
 const files = new Map(); // id -> { id, name, size, mime, url }
 const reads = new Map(); // channelId -> Map(name -> 最後に読んだメッセージの時刻)
@@ -91,12 +95,21 @@ function channelMembers(channel) {
   return channel.kind === "public" ? [...users.keys()] : channel.members;
 }
 
+// 名前の検証。問題があればエラーメッセージを返す
+function validateName(name) {
+  if (!name) return "名前を入力してください";
+  if ([...name].length > NAME_MAX) return `名前は${NAME_MAX}文字以内にしてください`;
+  if (/[\s@＠]/.test(name)) return "名前に空白や @ は使えません";
+  if (users.get(name)?.bot) return "その名前はボット用のため使えません";
+  return null;
+}
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const mentionRegex = (name, flags = "") => new RegExp(`[@＠]${escapeRegex(name)}(?=$|[\\s、。,.!?！？:：)）])`, flags);
+
 // 本文の @名前（全角の ＠ も可）から、チャンネルのメンバーへのメンションを取り出す
 function findMentions(text, channel) {
-  const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return channelMembers(channel).filter((name) =>
-    new RegExp(`[@＠]${escape(name)}(?=$|[\\s、。,.!?！？:：)）])`).test(text),
-  );
+  return channelMembers(channel).filter((name) => mentionRegex(name).test(text));
 }
 
 function setRead(channel, name, at) {
@@ -128,6 +141,7 @@ function initPayload(name) {
   return {
     type: "init",
     you: name,
+    limits: { nameMax: NAME_MAX, dmMax: DM_MAX, reactions: REACTIONS },
     users: [...users.values()].map(publicUser),
     channels: visible,
     messages: messages.filter((m) => ids.has(m.channelId)),
@@ -147,6 +161,9 @@ function postMessage(channel, fields) {
     docId: null,
     pinned: null, // { by, at }
     mentions: [],
+    reactions: {}, // emoji -> [name]
+    editedAt: null,
+    deleted: false,
     createdAt: Date.now(),
     ...fields,
   };
@@ -155,6 +172,50 @@ function postMessage(channel, fields) {
   // 自分の投稿は自分が読んだことにする
   if (!users.get(message.author)?.bot) setRead(channel, message.author, message.createdAt);
   return message;
+}
+
+function updateMessage(message) {
+  broadcastToChannel(channels.get(message.channelId), { type: "messageUpdate", message });
+}
+
+// 名前を変えたら、その名前を参照しているデータをすべて書き換え、全員に最新の状態を送り直す
+function renameUser(user, newName) {
+  const oldName = user.name;
+  const swap = (n) => (n === oldName ? newName : n);
+
+  users.delete(oldName);
+  user.name = newName;
+  users.set(newName, user);
+
+  for (const m of messages) {
+    m.author = swap(m.author);
+    if (m.pinned) m.pinned.by = swap(m.pinned.by);
+    if (m.mentions.includes(oldName)) {
+      m.mentions = m.mentions.map(swap);
+      m.text = m.text.replace(mentionRegex(oldName, "g"), `@${newName}`);
+    }
+    for (const emoji of Object.keys(m.reactions)) m.reactions[emoji] = m.reactions[emoji].map(swap);
+  }
+  for (const c of channels.values()) {
+    if (!c.members || !c.members.includes(oldName)) continue;
+    c.members = c.members.map(swap);
+    if (c.kind === "dm") c.name = c.members.join(" & ");
+  }
+  for (const map of reads.values()) {
+    if (!map.has(oldName)) continue;
+    map.set(newName, map.get(oldName));
+    map.delete(oldName);
+  }
+  for (const d of docs.values()) d.updatedBy = swap(d.updatedBy);
+
+  for (const u of users.values()) {
+    for (const ws of u.sockets) send(ws, initPayload(u.name));
+  }
+}
+
+function findDM(members) {
+  const key = [...members].sort().join("\n");
+  return [...channels.values()].find((c) => c.kind === "dm" && [...c.members].sort().join("\n") === key);
 }
 
 // ---- WebSocket ----
@@ -173,9 +234,9 @@ wss.on("connection", (ws) => {
     }
 
     if (data.type === "join") {
-      const name = String(data.name || "").trim().slice(0, 32);
-      if (!name) return send(ws, { type: "error", message: "名前を入力してください" });
-      if (users.get(name)?.bot) return send(ws, { type: "error", message: "その名前はボット用のため使えません" });
+      const name = String(data.name || "").trim();
+      const error = validateName(name);
+      if (error) return send(ws, { type: "error", message: error, code: "join" });
       if (!users.has(name)) {
         users.set(name, {
           name,
@@ -209,17 +270,61 @@ wss.on("connection", (ws) => {
         break;
       }
 
+      case "rename": {
+        const name = String(data.name || "").trim();
+        if (name === me.name) return;
+        const error = validateName(name) || (users.has(name) ? "その名前はすでに使われています" : null);
+        if (error) return send(ws, { type: "error", message: error });
+        renameUser(me, name);
+        break;
+      }
+
       case "message": {
         const channel = channels.get(data.channelId);
         if (!channel || !canSee(channel, me.name)) return;
         const text = String(data.text || "").slice(0, 4000);
         const file = data.fileId ? files.get(data.fileId) || null : null;
         if (!text.trim() && !file) return;
+        // スレッドは1段だけ。返信への返信は、元のスレッドに入れる
         const parent = messages.find((m) => m.id === data.parentId && m.channelId === channel.id);
+        const parentId = parent ? parent.parentId || parent.id : null;
         const mentions = findMentions(text, channel);
-        const message = postMessage(channel, { author: me.name, text, file, parentId: parent ? parent.id : null, mentions });
-        const botDM = channel.kind === "dm" && channel.members.includes(BOT);
+        const message = postMessage(channel, { author: me.name, text, file, parentId, mentions });
+        const botDM = channel.kind === "dm" && channel.members.length === 2 && channel.members.includes(BOT);
         if (mentions.includes(BOT) || botDM) botReply(channel, message);
+        break;
+      }
+
+      case "edit": {
+        const message = messages.find((m) => m.id === data.messageId);
+        if (!message || message.author !== me.name || message.deleted) return;
+        const text = String(data.text || "").slice(0, 4000);
+        if (!text.trim() && !message.file && !message.docId) return;
+        message.text = text;
+        message.mentions = findMentions(text, channels.get(message.channelId));
+        message.editedAt = Date.now();
+        updateMessage(message);
+        break;
+      }
+
+      case "delete": {
+        const message = messages.find((m) => m.id === data.messageId);
+        if (!message || message.author !== me.name || message.deleted) return;
+        // 返信の流れが分かるよう、メッセージ自体は残して中身だけ消す
+        Object.assign(message, { deleted: true, text: "", file: null, docId: null, mentions: [], reactions: {}, pinned: null });
+        updateMessage(message);
+        break;
+      }
+
+      case "react": {
+        const message = messages.find((m) => m.id === data.messageId);
+        if (!message || message.deleted || !REACTIONS.includes(data.emoji)) return;
+        if (!canSee(channels.get(message.channelId), me.name)) return;
+        const list = message.reactions[data.emoji] || [];
+        const next = list.includes(me.name) ? list.filter((n) => n !== me.name) : [...list, me.name];
+        if (next.length) message.reactions[data.emoji] = next;
+        else delete message.reactions[data.emoji];
+        updateMessage(message);
         break;
       }
 
@@ -243,11 +348,10 @@ wss.on("connection", (ws) => {
       case "pin": {
         // ピン留めはチャンネルの全員に共有する
         const message = messages.find((m) => m.id === data.messageId);
-        if (!message) return;
-        const channel = channels.get(message.channelId);
-        if (!canSee(channel, me.name)) return;
+        if (!message || message.deleted) return;
+        if (!canSee(channels.get(message.channelId), me.name)) return;
         message.pinned = data.on ? { by: me.name, at: Date.now() } : null;
-        broadcastToChannel(channel, { type: "messageUpdate", message });
+        updateMessage(message);
         break;
       }
 
@@ -272,14 +376,17 @@ wss.on("connection", (ws) => {
       }
 
       case "openDM": {
-        const other = String(data.with || "");
-        if (!users.has(other)) return;
-        const pair = [me.name, other].sort();
-        const dmId = `dm:${pair.join(":")}`;
-        let channel = channels.get(dmId);
+        // with は1人（1対1の DM）か、複数人（グループ DM）
+        const others = [].concat(data.with || []).map(String);
+        const members = [...new Set([me.name, ...others])];
+        if (others.some((n) => !users.has(n))) return;
+        if (members.length > DM_MAX) {
+          return send(ws, { type: "error", message: `DM に参加できるのは自分を含めて${DM_MAX}人までです` });
+        }
+        let channel = findDM(members);
         if (!channel) {
-          channel = { id: dmId, name: pair.join(" & "), kind: "dm", members: [...new Set(pair)] };
-          channels.set(dmId, channel);
+          channel = { id: `dm:${id()}`, name: members.join(" & "), kind: "dm", members };
+          channels.set(channel.id, channel);
           broadcastToChannel(channel, { type: "channel", channel });
         }
         send(ws, { type: "open", channelId: channel.id });

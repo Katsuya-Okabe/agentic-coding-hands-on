@@ -12,7 +12,7 @@
     <form id="login-form" class="card">
       <h1>⚡ Vibe Chat</h1>
       <p class="muted">チームの生産性と創造性を加速させる次世代コラボレーションハブ</p>
-      <input id="login-name" placeholder="表示名" maxlength="32" autofocus required>
+      <input id="login-name" placeholder="表示名（20文字まで）" maxlength="20" autofocus required>
       <button type="submit" class="primary">はじめる</button>
     </form>
   </div>
@@ -37,6 +37,10 @@
       <section>
         <header>チャンネル <button id="add-channel" class="ghost small" title="チャンネルを作成">＋</button></header>
         <ul id="channel-list"></ul>
+      </section>
+      <section>
+        <header>ダイレクトメッセージ <button id="add-dm" class="ghost small" title="DM を始める（3人まで）">＋</button></header>
+        <ul id="dm-list"></ul>
       </section>
       <section>
         <header>グループ <button id="add-group" class="ghost small" title="グループを作成">＋</button></header>
@@ -80,6 +84,11 @@
   <!-- ステータス編集 -->
   <dialog id="status-dialog">
     <form method="dialog" id="status-form">
+      <h3>プロフィール</h3>
+      <label>表示名 <span id="name-count" class="name-count"></span>
+        <input id="name-input" maxlength="20" autocomplete="off">
+        <span class="muted small-text">変更すると、過去のメッセージも新しい名前で表示されます</span>
+      </label>
       <h3>ステータス</h3>
       <label>状態
         <select id="status-select">
@@ -99,6 +108,19 @@
       <div class="actions">
         <button value="cancel" class="ghost">キャンセル</button>
         <button value="save" class="primary">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- DM 作成 -->
+  <dialog id="dm-dialog">
+    <form method="dialog">
+      <h3>ダイレクトメッセージを始める</h3>
+      <p id="dm-hint" class="muted small-text"></p>
+      <div id="dm-members" class="checklist"></div>
+      <div class="actions">
+        <button value="cancel" class="ghost">キャンセル</button>
+        <button value="start" class="primary">開始</button>
       </div>
     </form>
   </dialog>
